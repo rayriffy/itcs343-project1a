@@ -11,9 +11,9 @@
 *
 * 1. Queue structure
 *    Queue system is beased on frist come frist serve stragety storing as array
-*    [0, 0] - Intitialized data
+*    [-1, -1] - Intitialized data
 *    [9, 3] - Customer ID 9 requesting service type 3
-*    [-1, -1] - Queue had been removed
+*    [-2, -2] - Queue had been removed
 *
 * 2. Service type
 *    0 - ATM service
@@ -45,9 +45,7 @@ int currentTime = 0; // Current running time
 int nextCustomerSet = 0; // Specify when next customer is going to be added in queue
 
 // Tell that service has done process in each minute
-bool isATMDone = false;
-bool isChequeDone = false;
-bool isExchangeDone = false;
+bool isServiceDone[3] = { false, false, false };
 
 // Create customer thread
 void *customer(void *threadNo);
@@ -63,7 +61,7 @@ void *customer(void *threadNo) {
   pthread_mutex_lock(&mutex);
   int obtainedQueue = queuePointer;
   queue[queuePointer][0] = customerID;
-  queue[queuePointer][0] = serviceType;
+  queue[queuePointer][1] = serviceType;
   printf("[customer]: customer %d obtained queue %d for service %d\n", customerID ,queuePointer, serviceType);
   queuePointer++;
   pthread_mutex_unlock(&mutex);
@@ -92,7 +90,7 @@ void *service(void *threadNo) {
           if (queue[i][1] == serviceType) {
             servicingCustomer = queue[i][0];
             servicingCustomerQueuePosition = i;
-            serviceTimeLeft = serviceType;
+            serviceTimeLeft = serviceType + 1;
             break;
           }
         }
@@ -100,6 +98,7 @@ void *service(void *threadNo) {
         if (servicingCustomer == -1) {
           printf("[service %d]: no queue to serve right now...\n", serviceType);
           lastRunMinute = currentTime;
+          isServiceDone[serviceType] = true;
         } else {
           printf("[service %d]: found customer %d to service\n", serviceType, servicingCustomer);
         }
@@ -109,16 +108,17 @@ void *service(void *threadNo) {
 
         // If service is done, then remove from queue
         if (serviceTimeLeft == 0) {
-          printf("[service %d]: service customer %d is completed removing from queue...", serviceType, servicingCustomer);
-          queue[servicingCustomerQueuePosition][0] = -1;
-          queue[servicingCustomerQueuePosition][1] = -1;
+          printf("[service %d]: service customer %d is completed removing from queue...\n", serviceType, servicingCustomer);
+          queue[servicingCustomerQueuePosition][0] = -2;
+          queue[servicingCustomerQueuePosition][1] = -2;
           servicingCustomer = -1;
           serviceTimeLeft = -1;
-          printf("[service %d]: done! ready to service next customer in the next minute", serviceType);
+          printf("[service %d]: done! ready to service next customer in the next minute\n", serviceType);
         }
 
         // Finalize process in current minute
         lastRunMinute = currentTime;
+        isServiceDone[serviceType] = true;
       }
     }
 
@@ -140,7 +140,8 @@ int main() {
 
   // Set all value in queue to 0 (inactive)
   for (int i = 0 ; i < MAX_QUEUE ; i++) {
-    queue[i][0] = 0;
+    queue[i][0] = -1;
+    queue[i][1] = -1;
   }
   printf("[core]: done\n");
 
@@ -159,7 +160,7 @@ int main() {
     if (currentTime % 5 == 0 && lastTimeCustomerCreated != currentTime) {
       // Random customer between 5-10 customers
       lastTimeCustomerCreated = currentTime;
-      int amountCustomer = (rand() % 5) - 5;
+      int amountCustomer = (rand() % 5) + 5;
 
       printf("[system]: %d customers being created in minute %d\n", amountCustomer, currentTime + 1);
 
@@ -173,11 +174,32 @@ int main() {
     /**
     * When all service is done, increment time by one and start all over
     */
-    if (isATMDone == true && isChequeDone == true && isExchangeDone == true) {
+    if (isServiceDone[0] == true && isServiceDone[1] == true && isServiceDone[2] == true) {
+      // Report
+      printf("\n");
+      printf("----------\n");
+      printf("END OF MINUTE %d\n", currentTime + 1);
+      printf("----------\n");
+      printf("In queue:\n");
+      for (int i = 0; i < 3 ; i++) {
+        printf("Service %d:\n", i);
+        int count = 0;
+        printf("  Queue > ");
+        for (int j = 0 ; j < MAX_QUEUE ; j++) {
+          if (queue[j][1] == i) {
+            count++;
+            printf("%d ", queue[j][0]);
+          }
+        }
+        printf("\n");
+        printf("  Total > %d\n", count);
+      }
+      printf("\n");
+
       currentTime++;
-      isATMDone == false;
-      isChequeDone == false;
-      isExchangeDone == false;
+      isServiceDone[0] = false;
+      isServiceDone[1] = false;
+      isServiceDone[2] = false;
     }
   }
   printf("[system]: time up! service is now closed after %d mintutes\n", MAX_TIME);
