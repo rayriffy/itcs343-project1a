@@ -157,7 +157,7 @@ int main() {
     */
 
     // Create new customer every 5 minutes
-    if (currentTime % 5 == 0 && lastTimeCustomerCreated != currentTime) {
+    if ((currentTime + 1) % 5 == 0 && lastTimeCustomerCreated != currentTime) {
       // Random customer between 5-10 customers
       lastTimeCustomerCreated = currentTime;
       int amountCustomer = (rand() % 5) + 5;
